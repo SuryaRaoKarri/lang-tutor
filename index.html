@@ -55,11 +55,12 @@
             font-size: 14px;
             margin-bottom: 15px;
             box-sizing: border-box;
+            resize: vertical;
         }
 
         .settings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 15px;
             background-color: var(--card-bg);
             padding: 15px;
@@ -71,19 +72,48 @@
         .setting-item {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 8px;
             font-size: 13px;
             color: var(--text-muted);
         }
 
-        input[type="range"], input[type="number"], select {
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Styling for dropdowns and number inputs */
+        input[type="number"], select {
             background-color: var(--bg-color);
             color: var(--text-main);
             border: 1px solid var(--border-color);
             padding: 6px;
             border-radius: 4px;
-            width: 100%;
             box-sizing: border-box;
+        }
+
+        /* Make dropdowns full width of their grid cell */
+        select {
+            width: 100%;
+        }
+
+        /* Specific sizing for the number input box */
+        input[type="number"] {
+            width: 55px;
+            text-align: center;
+            padding: 6px 4px;
+        }
+
+        /* Styling for the slider */
+        input[type="range"] {
+            flex: 1;
+            accent-color: var(--primary);
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
         }
 
         .action-buttons {
@@ -154,8 +184,9 @@
         .counter {
             font-size: 0.8rem;
             color: var(--text-muted);
-            min-width: 40px;
+            min-width: 50px;
             text-align: right;
+            font-weight: 600;
         }
 
     </style>
@@ -173,16 +204,38 @@
             <select id="frVoiceSelect"></select>
         </div>
         <div class="setting-item">
-            <label>Speed (Default 0.8): <span id="speedVal">0.8</span></label>
-            <input type="range" id="speedRate" min="0.5" max="1.2" step="0.1" value="0.8" oninput="document.getElementById('speedVal').innerText = this.value">
+            <label>English Voice:</label>
+            <select id="enVoiceSelect"></select>
+        </div>
+        
+        <div class="setting-item">
+            <label>Speed (Default 0.8):</label>
+            <div class="input-group">
+                <input type="range" id="speedRate" min="0.5" max="1.5" step="0.1" value="0.8" oninput="speedNum.value = this.value">
+                <input type="number" id="speedNum" min="0.5" max="1.5" step="0.1" value="0.8" oninput="speedRate.value = this.value">
+            </div>
         </div>
         <div class="setting-item">
-            <label>Pause Timing (seconds): <span id="pauseVal">1.5</span>s</label>
-            <input type="range" id="pauseTime" min="0" max="4" step="0.5" value="1.5" oninput="document.getElementById('pauseVal').innerText = this.value">
+            <label>Pause Timing (Seconds):</label>
+            <div class="input-group">
+                <input type="range" id="pauseTime" min="0" max="4" step="0.5" value="1.5" oninput="pauseNum.value = this.value">
+                <input type="number" id="pauseNum" min="0" max="4" step="0.5" value="1.5" oninput="pauseTime.value = this.value">
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <label>French Repeats:</label>
+            <div class="input-group">
+                <input type="range" id="frRepeatRate" min="1" max="10" value="3" oninput="frRepeatNum.value = this.value">
+                <input type="number" id="frRepeatNum" min="1" max="10" value="3" oninput="frRepeatRate.value = this.value">
+            </div>
         </div>
         <div class="setting-item">
-            <label>Repeat Each Line:</label>
-            <input type="number" id="repeatCount" min="1" max="20" value="5">
+            <label>English Repeats:</label>
+            <div class="input-group">
+                <input type="range" id="enRepeatRate" min="0" max="10" value="1" oninput="enRepeatNum.value = this.value">
+                <input type="number" id="enRepeatNum" min="0" max="10" value="1" oninput="enRepeatRate.value = this.value">
+            </div>
         </div>
     </div>
 
@@ -207,14 +260,22 @@
     let isPlaying = false;
     let isAutoPlayingAll = false;
     let currentLineIndex = 0;
-    let currentRepeatNumber = 0;
-    let timeoutIds =[]; // To clear pauses if user clicks Stop
+    let timeoutIds =[]; 
+    let cancelSleep = null;
+    let currentSessionId = 0; // The Kill Switch ID
+    
+    // Fix for Chrome bug where long audio stops randomly
+    window.utteranceWorkaround =[];
 
     // Load voices
     function populateVoiceList() {
         const voices = synth.getVoices();
-        const voiceSelect = document.getElementById('frVoiceSelect');
-        voiceSelect.innerHTML = '';
+        if (voices.length === 0) return;
+
+        const frSelect = document.getElementById('frVoiceSelect');
+        const enSelect = document.getElementById('enVoiceSelect');
+        frSelect.innerHTML = '';
+        enSelect.innerHTML = '';
         
         let frVoices = voices.filter(v => v.lang.startsWith('fr'));
         let enVoices = voices.filter(v => v.lang.startsWith('en'));
@@ -227,10 +288,19 @@
             option.textContent = `${voice.name} (${voice.lang})`;
             option.value = i;
             if(voice === frVoice) option.selected = true;
-            voiceSelect.appendChild(option);
+            frSelect.appendChild(option);
         });
 
-        voiceSelect.onchange = (e) => { frVoice = frVoices[e.target.value]; };
+        enVoices.forEach((voice, i) => {
+            const option = document.createElement('option');
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.value = i;
+            if(voice === enVoice) option.selected = true;
+            enSelect.appendChild(option);
+        });
+
+        frSelect.onchange = (e) => { frVoice = frVoices[e.target.value]; };
+        enSelect.onchange = (e) => { enVoice = enVoices[e.target.value]; };
     }
 
     populateVoiceList();
@@ -276,12 +346,44 @@
         });
     }
 
+    // Helper to pause execution
+    function sleep(ms) {
+        return new Promise(resolve => {
+            const id = setTimeout(resolve, ms);
+            timeoutIds.push(id);
+            cancelSleep = () => { clearTimeout(id); resolve(); };
+        });
+    }
+
+    // Helper to speak text asynchronously
+    function speakAsync(text, voice, rate) {
+        return new Promise(resolve => {
+            if (!text || text.trim() === '') { resolve(); return; }
+            const u = new SpeechSynthesisUtterance(text);
+            u.voice = voice;
+            u.rate = rate;
+            
+            u.onend = () => resolve();
+            u.onerror = () => resolve(); // Resolve even if canceled to avoid freezing
+            
+            // Keep utterance in memory to prevent Chrome bug
+            window.utteranceWorkaround.push(u);
+            if(window.utteranceWorkaround.length > 5) window.utteranceWorkaround.shift();
+
+            synth.speak(u);
+        });
+    }
+
     function stopAudio() {
+        currentSessionId++; // Kills any currently running loops
         isPlaying = false;
         isAutoPlayingAll = false;
-        synth.cancel(); // Stop TTS
-        timeoutIds.forEach(clearTimeout); // Clear all JS pauses
+        
+        synth.cancel(); // Stop TTS audio instantly
+        
+        timeoutIds.forEach(clearTimeout); // Clear timers
         timeoutIds =[];
+        if (cancelSleep) cancelSleep(); // Force wake up from sleep
         
         // Remove highlights
         document.querySelectorAll('.list-item').forEach(el => el.classList.remove('playing'));
@@ -290,90 +392,94 @@
 
     function playSingleLine(index) {
         stopAudio();
-        isAutoPlayingAll = false;
-        currentLineIndex = index;
-        currentRepeatNumber = 1;
-        executePlaySequence();
+        // Wait 50ms to ensure the browser successfully cleared the old audio
+        setTimeout(() => {
+            isAutoPlayingAll = false;
+            currentLineIndex = index;
+            startPlaybackLoop();
+        }, 50);
     }
 
     function startAutoPlay() {
         if(parsedData.length === 0) return;
         stopAudio();
-        isAutoPlayingAll = true;
-        currentLineIndex = 0;
-        currentRepeatNumber = 1;
-        executePlaySequence();
+        setTimeout(() => {
+            isAutoPlayingAll = true;
+            currentLineIndex = 0;
+            startPlaybackLoop();
+        }, 50);
     }
 
-    // Core Recursive Playback Function
-    function executePlaySequence() {
-        if (!isAutoPlayingAll && currentRepeatNumber > getTargetRepeats()) {
-            stopAudio(); // Finished single line repeats
-            return;
-        }
-
-        if (isAutoPlayingAll && currentLineIndex >= parsedData.length) {
-            stopAudio(); // Finished entire list
-            return;
-        }
-
-        if (isAutoPlayingAll && currentRepeatNumber > getTargetRepeats()) {
-            // Move to next line
-            currentLineIndex++;
-            currentRepeatNumber = 1;
-            executePlaySequence(); // recursive call for next line
-            return;
-        }
-
+    async function startPlaybackLoop() {
+        const sessionId = currentSessionId; // Lock this loop to the current session
         isPlaying = true;
-        const item = parsedData[currentLineIndex];
-        
-        // UI Updates
-        document.querySelectorAll('.list-item').forEach(el => el.classList.remove('playing'));
-        document.getElementById(`item-${item.id}`).classList.add('playing');
-        document.getElementById(`counter-${item.id}`).innerText = `${currentRepeatNumber}/${getTargetRepeats()}`;
 
-        // Settings
-        const rate = parseFloat(document.getElementById('speedRate').value);
-        const pauseMs = parseFloat(document.getElementById('pauseTime').value) * 1000;
+        while (isPlaying && currentLineIndex < parsedData.length) {
+            if (sessionId !== currentSessionId) return; // Kill switch triggered
 
-        // Utterances
-        const utterFr = new SpeechSynthesisUtterance(item.fr);
-        utterFr.voice = frVoice;
-        utterFr.rate = rate;
+            const item = parsedData[currentLineIndex];
+            
+            // UI Updates
+            document.querySelectorAll('.list-item').forEach(el => el.classList.remove('playing'));
+            const currentRow = document.getElementById(`item-${item.id}`);
+            const counterEl = document.getElementById(`counter-${item.id}`);
+            
+            if(currentRow) currentRow.classList.add('playing');
 
-        const utterEn = new SpeechSynthesisUtterance(item.en);
-        utterEn.voice = enVoice;
-        utterEn.rate = 1.0;
+            // Read Settings
+            const rate = parseFloat(document.getElementById('speedNum').value);
+            const pauseMs = parseFloat(document.getElementById('pauseNum').value) * 1000;
+            const frRepeats = parseInt(document.getElementById('frRepeatNum').value) || 1;
+            const enRepeats = parseInt(document.getElementById('enRepeatNum').value) || 1;
 
-        // French ends -> wait -> play English
-        utterFr.onend = function() {
-            if(!isPlaying) return;
-            if(item.en !== '') {
-                const t1 = setTimeout(() => { synth.speak(utterEn); }, pauseMs);
-                timeoutIds.push(t1);
-            } else {
-                triggerNextLoop(); // If no English, just loop
+            // --- Play English Sequence FIRST ---
+            if (item.en && isPlaying) {
+                for (let i = 1; i <= enRepeats; i++) {
+                    if (sessionId !== currentSessionId) return; // Check kill switch again
+                    if (counterEl) counterEl.innerText = `EN: ${i}/${enRepeats}`;
+                    
+                    await speakAsync(item.en, enVoice, 1.0); 
+                    
+                    if (sessionId !== currentSessionId) return; 
+                    if (isPlaying && (i < enRepeats || (item.fr && frRepeats > 0))) {
+                        await sleep(pauseMs);
+                    }
+                }
             }
-        };
 
-        // English ends -> wait short bit -> trigger next loop
-        utterEn.onend = function() {
-            if(!isPlaying) return;
-            const t2 = setTimeout(() => { triggerNextLoop(); }, 1000); // fixed 1s gap before repeating line
-            timeoutIds.push(t2);
-        };
+            // --- Play French Sequence SECOND ---
+            if (item.fr && isPlaying) {
+                for (let i = 1; i <= frRepeats; i++) {
+                    if (sessionId !== currentSessionId) return; // Check kill switch
+                    if (counterEl) counterEl.innerText = `FR: ${i}/${frRepeats}`;
+                    
+                    await speakAsync(item.fr, frVoice, rate);
+                    
+                    if (sessionId !== currentSessionId) return;
+                    if (isPlaying && i < frRepeats) {
+                        await sleep(pauseMs);
+                    }
+                }
+            }
 
-        synth.speak(utterFr);
-    }
+            if (sessionId !== currentSessionId) return;
+            if (counterEl) counterEl.innerText = `Done`;
 
-    function triggerNextLoop() {
-        currentRepeatNumber++;
-        executePlaySequence();
-    }
+            // If we are only playing one line, stop here
+            if (!isAutoPlayingAll) {
+                isPlaying = false;
+                break;
+            }
 
-    function getTargetRepeats() {
-        return parseInt(document.getElementById('repeatCount').value) || 1;
+            // Move to next line
+            await sleep(1500);
+            currentLineIndex++;
+        }
+
+        // If auto-play finished naturally
+        if (currentLineIndex >= parsedData.length && isAutoPlayingAll && sessionId === currentSessionId) {
+            stopAudio();
+        }
     }
 </script>
 </body>
