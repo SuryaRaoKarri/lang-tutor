@@ -1,0 +1,380 @@
+<!-- 
+  French Auto-Loop Tutor V2 
+  Licensed under the Apache License, Version 2.0 (the "License");
+  You may not use this file except in compliance with the License.
+  http://www.apache.org/licenses/LICENSE-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surya's French Auto-Loop Tutor V2</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --french-color: #60a5fa;
+            --english-color: #34d399;
+            --playing-bg: #334155;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 { text-align: center; font-size: 1.5rem; color: var(--text-muted); margin-bottom: 15px;}
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        input[type="range"], input[type="number"], select {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            flex: 1;
+            transition: all 0.2s;
+        }
+
+        button:hover { background-color: var(--border-color); }
+        
+        button.primary { background-color: var(--primary); border-color: var(--primary); }
+        button.primary:hover { background-color: var(--primary-hover); }
+        
+        button.danger { background-color: var(--danger); border-color: var(--danger); }
+        button.danger:hover { background-color: var(--danger-hover); }
+
+        /* List View Styles */
+        .list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .list-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .list-item.playing {
+            background-color: var(--playing-bg);
+            border-left: 4px solid var(--primary);
+        }
+
+        .text-group { flex: 1; display: flex; flex-direction: column; gap: 4px;}
+        .fr-text { font-size: 1.1rem; font-weight: bold; color: var(--french-color); }
+        .en-text { font-size: 0.95rem; color: var(--english-color); }
+
+        .play-btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 10px;
+            flex: 0 0 auto;
+        }
+        .play-btn:hover { color: var(--primary); background: none;}
+
+        .counter {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            min-width: 40px;
+            text-align: right;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🇫🇷 French Auto-Loop Tutor V2</h1>
+    
+    <textarea id="inputText" placeholder="Paste vocabulary here (French - English)..."></textarea>
+
+    <div class="settings-grid">
+        <div class="setting-item">
+            <label>French Voice:</label>
+            <select id="frVoiceSelect"></select>
+        </div>
+        <div class="setting-item">
+            <label>Speed (Default 0.8): <span id="speedVal">0.8</span></label>
+            <input type="range" id="speedRate" min="0.5" max="1.2" step="0.1" value="0.8" oninput="document.getElementById('speedVal').innerText = this.value">
+        </div>
+        <div class="setting-item">
+            <label>Pause Timing (seconds): <span id="pauseVal">1.5</span>s</label>
+            <input type="range" id="pauseTime" min="0" max="4" step="0.5" value="1.5" oninput="document.getElementById('pauseVal').innerText = this.value">
+        </div>
+        <div class="setting-item">
+            <label>Repeat Each Line:</label>
+            <input type="number" id="repeatCount" min="1" max="20" value="5">
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <button onclick="loadData()">1. Load List</button>
+        <button class="primary" onclick="startAutoPlay()">2. ▶ Play All (Top to Bottom)</button>
+        <button class="danger" onclick="stopAudio()">⏹ Stop</button>
+    </div>
+
+    <div class="list-container" id="listView">
+        <!-- List items will be injected here -->
+    </div>
+</div>
+
+<script>
+    let parsedData =[];
+    let synth = window.speechSynthesis;
+    let frVoice = null;
+    let enVoice = null;
+    
+    // Playback state
+    let isPlaying = false;
+    let isAutoPlayingAll = false;
+    let currentLineIndex = 0;
+    let currentRepeatNumber = 0;
+    let timeoutIds =[]; // To clear pauses if user clicks Stop
+
+    // Load voices
+    function populateVoiceList() {
+        const voices = synth.getVoices();
+        const voiceSelect = document.getElementById('frVoiceSelect');
+        voiceSelect.innerHTML = '';
+        
+        let frVoices = voices.filter(v => v.lang.startsWith('fr'));
+        let enVoices = voices.filter(v => v.lang.startsWith('en'));
+
+        frVoice = frVoices.find(v => v.lang === 'fr-FR' || v.lang === 'fr-CA') || frVoices[0] || voices[0];
+        enVoice = enVoices.find(v => v.lang === 'en-US' || v.lang === 'en-GB') || enVoices[0] || voices[0];
+
+        frVoices.forEach((voice, i) => {
+            const option = document.createElement('option');
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.value = i;
+            if(voice === frVoice) option.selected = true;
+            voiceSelect.appendChild(option);
+        });
+
+        voiceSelect.onchange = (e) => { frVoice = frVoices[e.target.value]; };
+    }
+
+    populateVoiceList();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = populateVoiceList;
+    }
+
+    function loadData() {
+        stopAudio();
+        const text = document.getElementById('inputText').value;
+        const lines = text.split('\n').filter(l => l.trim() !== '');
+        
+        parsedData = lines.map((line, index) => {
+            const parts = line.split(/[-=|]/);
+            return {
+                id: index,
+                fr: parts[0] ? parts[0].trim() : '',
+                en: parts[1] ? parts[1].trim() : ''
+            };
+        });
+
+        renderList();
+    }
+
+    function renderList() {
+        const container = document.getElementById('listView');
+        container.innerHTML = '';
+
+        parsedData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.id = `item-${item.id}`;
+            
+            div.innerHTML = `
+                <button class="play-btn" onclick="playSingleLine(${item.id})">▶</button>
+                <div class="text-group">
+                    <div class="fr-text">${item.fr}</div>
+                    <div class="en-text">${item.en}</div>
+                </div>
+                <div class="counter" id="counter-${item.id}"></div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function stopAudio() {
+        isPlaying = false;
+        isAutoPlayingAll = false;
+        synth.cancel(); // Stop TTS
+        timeoutIds.forEach(clearTimeout); // Clear all JS pauses
+        timeoutIds =[];
+        
+        // Remove highlights
+        document.querySelectorAll('.list-item').forEach(el => el.classList.remove('playing'));
+        document.querySelectorAll('.counter').forEach(el => el.innerText = '');
+    }
+
+    function playSingleLine(index) {
+        stopAudio();
+        isAutoPlayingAll = false;
+        currentLineIndex = index;
+        currentRepeatNumber = 1;
+        executePlaySequence();
+    }
+
+    function startAutoPlay() {
+        if(parsedData.length === 0) return;
+        stopAudio();
+        isAutoPlayingAll = true;
+        currentLineIndex = 0;
+        currentRepeatNumber = 1;
+        executePlaySequence();
+    }
+
+    // Core Recursive Playback Function
+    function executePlaySequence() {
+        if (!isAutoPlayingAll && currentRepeatNumber > getTargetRepeats()) {
+            stopAudio(); // Finished single line repeats
+            return;
+        }
+
+        if (isAutoPlayingAll && currentLineIndex >= parsedData.length) {
+            stopAudio(); // Finished entire list
+            return;
+        }
+
+        if (isAutoPlayingAll && currentRepeatNumber > getTargetRepeats()) {
+            // Move to next line
+            currentLineIndex++;
+            currentRepeatNumber = 1;
+            executePlaySequence(); // recursive call for next line
+            return;
+        }
+
+        isPlaying = true;
+        const item = parsedData[currentLineIndex];
+        
+        // UI Updates
+        document.querySelectorAll('.list-item').forEach(el => el.classList.remove('playing'));
+        document.getElementById(`item-${item.id}`).classList.add('playing');
+        document.getElementById(`counter-${item.id}`).innerText = `${currentRepeatNumber}/${getTargetRepeats()}`;
+
+        // Settings
+        const rate = parseFloat(document.getElementById('speedRate').value);
+        const pauseMs = parseFloat(document.getElementById('pauseTime').value) * 1000;
+
+        // Utterances
+        const utterFr = new SpeechSynthesisUtterance(item.fr);
+        utterFr.voice = frVoice;
+        utterFr.rate = rate;
+
+        const utterEn = new SpeechSynthesisUtterance(item.en);
+        utterEn.voice = enVoice;
+        utterEn.rate = 1.0;
+
+        // French ends -> wait -> play English
+        utterFr.onend = function() {
+            if(!isPlaying) return;
+            if(item.en !== '') {
+                const t1 = setTimeout(() => { synth.speak(utterEn); }, pauseMs);
+                timeoutIds.push(t1);
+            } else {
+                triggerNextLoop(); // If no English, just loop
+            }
+        };
+
+        // English ends -> wait short bit -> trigger next loop
+        utterEn.onend = function() {
+            if(!isPlaying) return;
+            const t2 = setTimeout(() => { triggerNextLoop(); }, 1000); // fixed 1s gap before repeating line
+            timeoutIds.push(t2);
+        };
+
+        synth.speak(utterFr);
+    }
+
+    function triggerNextLoop() {
+        currentRepeatNumber++;
+        executePlaySequence();
+    }
+
+    function getTargetRepeats() {
+        return parseInt(document.getElementById('repeatCount').value) || 1;
+    }
+</script>
+</body>
+</html>
