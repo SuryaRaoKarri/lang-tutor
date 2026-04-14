@@ -314,12 +314,24 @@
         const lines = text.split('\n').filter(l => l.trim() !== '');
         
         parsedData = lines.map((line, index) => {
-            const parts = line.split(/[-=|]/);
-            return {
-                id: index,
-                fr: parts[0] ? parts[0].trim() : '',
-                en: parts[1] ? parts[1].trim() : ''
-            };
+            // splits on the FIRST occurrence of:
+            // " - " (hyphen with spaces), "=" (equals), or "|" (pipe)
+            const match = line.match(/^(.*?)(?:\s+-\s+|\s*=\s*|\s*\|\s*)(.*)$/);
+            
+            if (match) {
+                return {
+                    id: index,
+                    fr: match[1].trim(),
+                    en: match[2].trim()
+                };
+            } else {
+                // Fallback if no separator is found on the line
+                return {
+                    id: index,
+                    fr: line.trim(),
+                    en: ''
+                };
+            }
         });
 
         renderList();
